@@ -1,11 +1,15 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"flag"
 	"os"
+	"time"
 
 	"github.com/f-taxes/binance_conversion/ctl"
 	"github.com/f-taxes/binance_conversion/global"
+	g "github.com/f-taxes/binance_conversion/grpc_client"
 	"github.com/kataras/golog"
 )
 
@@ -26,5 +30,23 @@ func init() {
 }
 
 func main() {
+	grpcAddress := flag.String("grpc-addr", "127.0.0.1:4222", "GRPC address of the f-taxes server that the plugin will attempt to connect to.")
+	flag.Parse()
+
+	ctx := context.Background()
+	g.GrpcClient = g.NewFTaxesClient(*grpcAddress)
+
+	err := g.GrpcClient.Connect(ctx)
+	if err != nil {
+		golog.Fatal(err)
+	}
+
+	go func() {
+		for {
+			g.GrpcClient.PluginHeartbeat(context.Background())
+			time.Sleep(time.Second * 5)
+		}
+	}()
+
 	ctl.Start(global.Plugin.Ctl.Address)
 }
